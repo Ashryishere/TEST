@@ -1,6 +1,7 @@
 import os
+import zipfile
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 import fitz
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -15,12 +16,20 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 try:
+    with zipfile.ZipFile('LastModelRFC.zip', 'r') as zip_ref:
+        zip_ref.extractall('')
     with open('LastModelRFC.pkl', 'rb') as file:
         loaded_model = pickle.load(file)
     with open('LastVectorizer.pkl', 'rb') as file:
         loaded_vectorizer = pickle.load(file)
+except ImportError as e:
+    logging.error(f"Error loading model/vectorizer due to missing module: {e}")
+    loaded_model = None
+    loaded_vectorizer = None
 except Exception as e:
     logging.error(f"Error loading model/vectorizer: {e}")
+    loaded_model = None
+    loaded_vectorizer = None
 
 # Function to extract text from PDF
 def extract_text_from_pdf(pdf_path):
@@ -49,7 +58,7 @@ def calculate_similarity_scores(vectorizer, job_descs, resume_text):
             job_desc_vectorized = vectorizer.transform([job_desc])
             score = cosine_similarity(job_desc_vectorized, resume_vectorized)
             scores.append(score[0][0])
-        
+
         logging.info("Similarity scores calculated successfully")
         return scores
     except Exception as e:
@@ -86,6 +95,10 @@ def upload_cv():
         job_desc_data = pd.read_csv(csv_file_path)
         job_descriptions = job_desc_data['Job Description'].dropna().tolist()
 
+        # Check if vectorizer is loaded
+        if loaded_vectorizer is None:
+            return jsonify({'error': 'Vectorizer not loaded properly'}), 500
+
         # Calculate similarity scores
         similarity_scores = calculate_similarity_scores(loaded_vectorizer, job_descriptions, resume_text)
         if similarity_scores is None:
@@ -104,30 +117,28 @@ def upload_cv():
         plt.pie(scores, labels=titles, autopct='%1.1f%%')
         plt.title('Top 3 Matching Job Positions')
 
-        # Save the plot image
-        plot_image_dir = os.getenv('PLOT_IMAGE_DIR', '')
+        # Ensure PLOT_IMAGE_DIR is set and valid
+        plot_image_dir = os.getenv('PLOT_IMAGE_DIR', 'plots')
         if not os.path.exists(plot_image_dir):
             os.makedirs(plot_image_dir)
         plot_image_path = os.path.join(plot_image_dir, 'results.png')
-        plt.savefig(plot_image_path)
 
+        plt.savefig(plot_image_path)
         plt.close()  # Close the plot to free resources
 
         # Check if the image file exists
         if not os.path.exists(plot_image_path):
+            logging.error(f"Plot image path does not exist: {plot_image_path}")
             return jsonify({'error': 'Failed to save the plot image'}), 500
-
-        # Open the saved image automatically
-        img = Image.open(plot_image_path)
-        img.show()
 
         # Delete the uploaded CV after processing
         os.remove(cv_path)
 
         # Prepare a short summary for the user
-        summary = f"The top 3 job positions that match your CV are: {titles[0]} ({scores[0]}%), {titles[1]} ({scores[1]}%), and {titles[2]} ({scores[2]}%)."
+        summary = f"The top 3 job positions that match your CV are: {titles[0]} ({scores[0]:.1f}%), {titles[1]} ({scores[1]:.1f}%), and {titles[2]} ({scores[2]:.1f}%)."
 
-        return jsonify({'results': top_results, 'plot_image': plot_image_path, 'summary': summary})
+        return send_file(plot_image_path, mimetype='image/png', as_attachment=True, download_name='results.png')
+
     except Exception as e:
         logging.error(f"Error processing request: {e}")
         return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
