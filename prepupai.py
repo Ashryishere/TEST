@@ -8,7 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 import matplotlib.pyplot as plt
 from PIL import Image
-
+import zipfile
 app = Flask(__name__)
 
 # Configure logging
