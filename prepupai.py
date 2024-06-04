@@ -8,15 +8,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 import matplotlib.pyplot as plt
 from PIL import Image
-import zipfile
+
 app = Flask(__name__)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 
 try:
-    with zipfile.ZipFile('LastModelRFC.zip', 'r') as zip_ref:
-        zip_ref.extractall('')
     with open('LastModelRFC.pkl', 'rb') as file:
         loaded_model = pickle.load(file)
     with open('LastVectorizer.pkl', 'rb') as file:
