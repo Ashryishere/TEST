@@ -78,7 +78,7 @@ def upload_cv():
             return jsonify({'error': 'Failed to extract text from the PDF'}), 500
 
         # Provide the full path to the CSV file
-        csv_file_path = os.getenv('CSV_FILE_PATH', 'C:/Users/Kimo Store/Desktop/AI/final Dataset.csv')
+        csv_file_path = os.getenv('CSV_FILE_PATH', 'final Dataset.csv')
 
         # Check if the CSV file exists
         if not os.path.isfile(csv_file_path):
